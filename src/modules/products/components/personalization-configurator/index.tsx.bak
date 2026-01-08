@@ -1,0 +1,1077 @@
+"use client"
+
+import { useState, useEffect, useRef, useCallback } from "react"
+
+type PersonalizationZone = "lid" | "bottom"
+
+type ElementSettings = {
+  value: string
+  size: number
+  posX: number
+  posY: number
+  font?: string
+}
+
+type LogoSettings = {
+  preview: string
+  file?: File
+  size: number
+  posX: number
+  posY: number
+}
+
+type ImageValidation = {
+  status: 'success' | 'warning' | 'error'
+  message: string
+  details?: string
+}
+
+type ZonePersonalization = {
+  text?: ElementSettings
+  logo?: LogoSettings
+}
+
+type PersonalizationData = {
+  lid?: ZonePersonalization
+  bottom?: ZonePersonalization
+  totalPrice: number
+  couponApplied?: string
+}
+
+type Props = {
+  onPersonalizationChange: (data: PersonalizationData | null) => void
+  variantColor?: string
+  pricePerPersonalization?: number
+  locale?: string
+}
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  de: {
+    personalization: "Personalisierung",
+    perOption: "pro Option",
+    rotateToView: "Drehen zum Ansehen",
+    lid: "Deckel",
+    bottom: "Unterseite",
+    personalizeZone: "personalisieren",
+    text: "Text",
+    logo: "Logo",
+    uploadLogo: "Logo hochladen (PNG, SVG, max. 2MB)",
+    uploading: "Hochladen...",
+    couponCode: "Gutscheincode",
+    enterCode: "Code eingeben",
+    redeem: "Einlösen",
+    remove: "Entfernen",
+    discount: "Rabatt",
+    total: "Gesamt",
+    invalidCoupon: "Ungültiger Gutscheincode",
+    lidText: "Deckel Text",
+    lidLogo: "Deckel Logo",
+    bottomText: "Unterseite Text",
+    bottomLogo: "Unterseite Logo",
+    inside: "(innen)",
+    xPersonalization: "Personalisierung",
+    xPersonalizations: "Personalisierungen",
+    egName: "z.B. Max Mustermann",
+    egSecret: "z.B. Geheime Nachricht",
+    size: "Größe",
+    positionX: "Position X",
+    positionY: "Position Y",
+    expand: "Vergrößern",
+    collapse: "Verkleinern",
+  },
+  en: {
+    personalization: "Personalization",
+    perOption: "per option",
+    rotateToView: "Rotate to view",
+    lid: "Lid",
+    bottom: "Bottom",
+    personalizeZone: "personalize",
+    text: "Text",
+    logo: "Logo",
+    uploadLogo: "Upload logo (PNG, SVG, max. 2MB)",
+    uploading: "Uploading...",
+    couponCode: "Coupon Code",
+    enterCode: "Enter code",
+    redeem: "Apply",
+    remove: "Remove",
+    discount: "Discount",
+    total: "Total",
+    invalidCoupon: "Invalid coupon code",
+    lidText: "Lid text",
+    lidLogo: "Lid logo",
+    bottomText: "Bottom text",
+    bottomLogo: "Bottom logo",
+    inside: "(inside)",
+    xPersonalization: "personalization",
+    xPersonalizations: "personalizations",
+    egName: "e.g. John Doe",
+    egSecret: "e.g. Secret message",
+    size: "Size",
+    positionX: "Position X",
+    positionY: "Position Y",
+    expand: "Expand",
+    collapse: "Collapse",
+  },
+}
+
+// Google Fonts für Lasergravur
+const FONTS = [
+  { id: 'roboto', name: 'Roboto', family: "'Roboto', sans-serif", style: 'Modern' },
+  { id: 'playfair', name: 'Playfair Display', family: "'Playfair Display', serif", style: 'Elegant' },
+  { id: 'oswald', name: 'Oswald', family: "'Oswald', sans-serif", style: 'Bold' },
+  { id: 'pacifico', name: 'Pacifico', family: "'Pacifico', cursive", style: 'Handschrift' },
+  { id: 'bebas', name: 'Bebas Neue', family: "'Bebas Neue', sans-serif", style: 'Block' },
+  { id: 'courier', name: 'Courier Prime', family: "'Courier Prime', monospace", style: 'Monospace' },
+]
+
+// Complete color map with all variant colors (lowercase keys for case-insensitive lookup)
+const COLOR_MAP: Record<string, string> = {
+  // Blacks & Grays
+  black: "#1a1a1a",
+  gray: "#6b7280",
+  "slate gray": "#708090",
+  gunmetal: "#2a3439",
+  // Metallic
+  silver: "#c0c0c0", 
+  sliver: "#c0c0c0",  // Common typo in DB
+  gold: "#c9a962",    // WELANDA Gold
+  champagner: "#f7e7ce", 
+  // Greens
+  green: "#166534", 
+  "army green": "#4b5320",
+  "dark green": "#013220",
+  // Browns
+  mocca: "#6b4423", 
+  cognac: "#9a463d",
+  // Other colors
+  pink: "#ec4899",
+  rosa: "#ffc0cb",
+  purple: "#7c3aed",
+}
+
+// Helper function for case-insensitive color lookup
+const getColor = (variantColor: string): string => {
+  const key = variantColor.toLowerCase().trim()
+  return COLOR_MAP[key] || "#1a1a1a"
+}
+
+const ENGRAVING_COLOR = "#c0c0c0"
+
+// Global slider styles for WebKit browsers
+const sliderThumbStyle = `
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Playfair+Display:wght@400;500&family=Oswald:wght@400;500&family=Pacifico&family=Bebas+Neue&family=Courier+Prime:wght@400&display=swap');
+  
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #C9A962;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    background: #B8944F;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #C9A962;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  input[type="range"]::-moz-range-thumb:hover {
+    background: #B8944F;
+  }
+`
+
+const PERSONALIZATION_API = "http://159.195.50.163:3004"
+
+const VALID_COUPONS: Record<string, number> = {
+  "GRATIS100": 100,
+  "GRATIS50": 50,
+  "WELANDA25": 25,
+}
+
+const DEFAULT_SETTINGS = {
+  size: 100,
+  posX: 0,
+  posY: 0,
+}
+
+// Base sizes at 100% (will be scaled by preview size)
+const BASE_LOGO_SIZE = 0.4  // 40% of preview
+const BASE_FONT_MULTIPLIER = 0.11  // 11% of preview for base font
+
+export default function PersonalizationConfigurator({ 
+  onPersonalizationChange,
+  variantColor = "black",
+  pricePerPersonalization = 9.99,
+  locale = "de"
+}: Props) {
+  const t = TRANSLATIONS[locale] || TRANSLATIONS.de
+  
+  const [enabled, setEnabled] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [rotation, setRotation] = useState(0)
+  const [activeView, setActiveView] = useState<"lid" | "bottom">("lid")
+  
+  const [lidText, setLidText] = useState("")
+  const [lidTextSettings, setLidTextSettings] = useState({ ...DEFAULT_SETTINGS })
+  const [lidFont, setLidFont] = useState('roboto')
+  const [lidLogo, setLidLogo] = useState<{ preview: string; file?: File } | null>(null)
+  const [lidLogoSettings, setLidLogoSettings] = useState({ ...DEFAULT_SETTINGS })
+  
+  const [bottomText, setBottomText] = useState("")
+  const [bottomTextSettings, setBottomTextSettings] = useState({ ...DEFAULT_SETTINGS })
+  const [bottomFont, setBottomFont] = useState('roboto')
+  const [bottomLogo, setBottomLogo] = useState<{ preview: string; file?: File } | null>(null)
+  const [bottomLogoSettings, setBottomLogoSettings] = useState({ ...DEFAULT_SETTINGS })
+  
+  const [lidImageValidation, setLidImageValidation] = useState<ImageValidation | null>(null)
+  const [bottomImageValidation, setBottomImageValidation] = useState<ImageValidation | null>(null)
+  
+  const [couponCode, setCouponCode] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  
+  const [uploading, setUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  
+  const lidFileInputRef = useRef<HTMLInputElement>(null)
+  const bottomFileInputRef = useRef<HTMLInputElement>(null)
+
+  const bgColor = getColor(variantColor)
+
+  // Preview dimensions - scales everything proportionally
+  const previewSize = expanded ? 320 : 160
+  const containerSize = expanded ? 360 : 200
+  const scaleFactor = previewSize / 160 // Base reference is 160px
+
+  const countPersonalizations = () => {
+    let count = 0
+    if (lidText) count++
+    if (lidLogo) count++
+    if (bottomText) count++
+    if (bottomLogo) count++
+    return count
+  }
+
+  const personalizationCount = countPersonalizations()
+  
+  const calculatePrice = () => {
+    const basePrice = personalizationCount * pricePerPersonalization
+    if (appliedCoupon) {
+      return basePrice * (1 - appliedCoupon.discount / 100)
+    }
+    return basePrice
+  }
+
+  const totalPrice = calculatePrice()
+
+  useEffect(() => {
+    if (!enabled || personalizationCount === 0) {
+      onPersonalizationChange(null)
+      return
+    }
+
+    const data: PersonalizationData = {
+      totalPrice,
+      couponApplied: appliedCoupon?.code,
+    }
+
+    if (lidText || lidLogo) {
+      data.lid = {}
+      if (lidText) {
+        data.lid.text = { value: lidText, ...lidTextSettings, font: lidFont }
+      }
+      if (lidLogo) {
+        data.lid.logo = { preview: lidLogo.preview, file: lidLogo.file, ...lidLogoSettings }
+      }
+    }
+
+    if (bottomText || bottomLogo) {
+      data.bottom = {}
+      if (bottomText) {
+        data.bottom.text = { value: bottomText, ...bottomTextSettings, font: bottomFont }
+      }
+      if (bottomLogo) {
+        data.bottom.logo = { preview: bottomLogo.preview, file: bottomLogo.file, ...bottomLogoSettings }
+      }
+    }
+
+    onPersonalizationChange(data)
+  }, [enabled, lidText, lidTextSettings, lidFont, lidLogo, lidLogoSettings, bottomText, bottomTextSettings, bottomFont, bottomLogo, bottomLogoSettings, totalPrice, appliedCoupon, onPersonalizationChange, personalizationCount])
+  // Lock body scroll when expanded
+  useEffect(() => {
+    if (expanded) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.paddingRight = '15px' // Prevent layout shift
+    } else {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+    }
+  }, [expanded])
+
+
+
+  // Calculate font size based on text length
+  const getBaseFontSize = (text: string) => {
+    const baseSize = previewSize * BASE_FONT_MULTIPLIER
+    if (text.length <= 5) return baseSize
+    if (text.length <= 10) return baseSize * 0.8
+    if (text.length <= 15) return baseSize * 0.65
+    return baseSize * 0.5
+  }
+
+  // Calculate logo size
+  const getLogoSize = (sizePercent: number) => {
+    return previewSize * BASE_LOGO_SIZE * (sizePercent / 100)
+  }
+
+  // Calculate position offset in pixels
+  const getPositionOffset = (percent: number) => {
+    return (percent / 100) * (previewSize * 0.3) // Max 30% of preview in each direction
+  }
+
+  // Get font family from font ID
+  const getFontFamily = (fontId: string): string => {
+    const font = FONTS.find(f => f.id === fontId)
+    return font?.family || "'Roboto', sans-serif"
+  }
+
+  // Analyze image for laser engraving suitability
+  const analyzeImage = (file: File, dataUrl: string): Promise<ImageValidation> => {
+    return new Promise((resolve) => {
+      // SVG files are always good for laser
+      if (file.type === 'image/svg+xml') {
+        resolve({
+          status: 'success',
+          message: '✓ SVG-Grafik optimal für Gravur'
+        })
+        return
+      }
+
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve({ status: 'warning', message: 'Konnte Bild nicht analysieren' })
+          return
+        }
+
+        // Scale down for analysis
+        const maxSize = 100
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageData.data
+
+        let hasTransparency = false
+        let colorCount = new Set<string>()
+        let totalPixels = 0
+        let darkPixels = 0
+        let lightPixels = 0
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          const a = data[i + 3]
+
+          // Check transparency
+          if (a < 250) hasTransparency = true
+
+          // Count colors (simplified)
+          if (a > 10) {
+            const colorKey = Math.round(r/32) + ',' + Math.round(g/32) + ',' + Math.round(b/32)
+            colorCount.add(colorKey)
+            totalPixels++
+
+            // Check brightness
+            const brightness = (r + g + b) / 3
+            if (brightness < 64) darkPixels++
+            if (brightness > 192) lightPixels++
+          }
+        }
+
+        const uniqueColors = colorCount.size
+        const contrastRatio = Math.abs(darkPixels - lightPixels) / totalPixels
+
+        // Determine suitability
+        if (uniqueColors <= 8 && contrastRatio > 0.3) {
+          resolve({
+            status: 'success',
+            message: '✓ Grafik geeignet für Gravur',
+            details: hasTransparency ? 'Transparenz erkannt' : undefined
+          })
+        } else if (uniqueColors <= 20 || contrastRatio > 0.2) {
+          resolve({
+            status: 'warning',
+            message: '⚠ Grafik möglicherweise komplex',
+            details: 'Für beste Ergebnisse: Grafik mit klaren Konturen und wenig Details verwenden'
+          })
+        } else {
+          resolve({
+            status: 'warning',
+            message: '⚠ Komplexe Grafik erkannt',
+            details: 'Dieses Bild könnte für Lasergravur zu detailliert sein. Einfachere Grafiken mit klaren Konturen liefern bessere Ergebnisse.'
+          })
+        }
+      }
+
+      img.onerror = () => {
+        resolve({ status: 'error', message: 'Bild konnte nicht geladen werden' })
+      }
+
+      img.src = dataUrl
+    })
+  }
+
+  const handleFileSelect = useCallback(async (file: File, zone: "lid" | "bottom") => {
+    if (!file.type.match(/^image\/(png|svg\+xml|jpeg|jpg)$/)) {
+      setUploadError("Nur PNG, SVG oder JPG erlaubt")
+      return
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError("Datei zu groß (max. 2MB)")
+      return
+    }
+
+    setUploadError(null)
+    setUploading(true)
+    
+    // Clear previous validation
+    if (zone === "lid") {
+      setLidImageValidation(null)
+    } else {
+      setBottomImageValidation(null)
+    }
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const preview = e.target?.result as string
+      
+      // Analyze image for laser suitability
+      const validation = await analyzeImage(file, preview)
+      
+      if (zone === "lid") {
+        setLidLogo({ preview, file })
+        setLidLogoSettings({ ...DEFAULT_SETTINGS })
+        setLidImageValidation(validation); if (typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("editor_image_uploaded", { zone: "lid" }); }
+      } else {
+        setBottomLogo({ preview, file })
+        setBottomLogoSettings({ ...DEFAULT_SETTINGS })
+        setBottomImageValidation(validation); if (typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("editor_image_uploaded", { zone: "bottom" }); }
+      }
+    }
+    reader.readAsDataURL(file)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("zone", zone)
+
+      await fetch(`${PERSONALIZATION_API}/api/upload`, {
+        method: "POST",
+        body: formData,
+      })
+    } catch (error) {
+      console.warn("Upload error:", error)
+    } finally {
+      setUploading(false)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, zone: "lid" | "bottom") => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      handleFileSelect(files[0], zone)
+    }
+  }, [handleFileSelect])
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>, zone: "lid" | "bottom") => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      handleFileSelect(files[0], zone)
+    }
+  }
+
+  const removeLogo = (zone: "lid" | "bottom") => {
+    if (zone === "lid") {
+      setLidLogo(null)
+      setLidLogoSettings({ ...DEFAULT_SETTINGS })
+      setLidImageValidation(null)
+    } else {
+      setBottomLogo(null)
+      setBottomLogoSettings({ ...DEFAULT_SETTINGS })
+      setBottomImageValidation(null)
+    }
+    setUploadError(null)
+    const inputRef = zone === "lid" ? lidFileInputRef : bottomFileInputRef
+    if (inputRef.current) {
+      inputRef.current.value = ""
+    }
+  }
+
+  const applyCoupon = () => {
+    const code = couponCode.toUpperCase().trim()
+    if (VALID_COUPONS[code] !== undefined) {
+      setAppliedCoupon({ code, discount: VALID_COUPONS[code] }); if (typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("coupon_success", { code, discount: VALID_COUPONS[code], source: "personalization" }); }
+      setCouponError(null)
+    } else {
+      setCouponError(t.invalidCoupon); if (typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("coupon_failed", { code, source: "personalization" }); }
+      setAppliedCoupon(null)
+    }
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCode("")
+    setCouponError(null)
+  }
+
+  const renderSlider = (
+    label: string, 
+    value: number, 
+    onChange: (v: number) => void, 
+    min: number, 
+    max: number,
+    unit: string = ""
+  ) => (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-ui-fg-muted w-16 flex-shrink-0">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-welanda"
+        style={{
+          WebkitAppearance: 'none',
+          background: 'linear-gradient(to right, #C9A962 0%, #C9A962 ' + ((value - min) / (max - min) * 100) + '%, #e5e7eb ' + ((value - min) / (max - min) * 100) + '%, #e5e7eb 100%)'
+        }}
+      />
+      <span className="text-xs text-ui-fg-muted w-14 text-right">{value}{unit}</span>
+    </div>
+  )
+
+  const renderFontSelect = (
+    currentFont: string,
+    onChange: (fontId: string) => void,
+    previewText: string
+  ) => (
+    <div className="mt-2">
+      <label className="block text-xs font-medium text-ui-fg-muted mb-1">Schriftart</label>
+      <select
+        value={currentFont}
+        onChange={(e) => { onChange(e.target.value); if (typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("editor_font_selected", { fontName: e.target.value }); } }}
+        className="w-full p-2 text-sm border border-ui-border-base rounded-lg bg-ui-bg-field text-ui-fg-base focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
+        style={{ fontFamily: getFontFamily(currentFont) }}
+      >
+        {FONTS.map((font) => (
+          <option 
+            key={font.id} 
+            value={font.id}
+            style={{ fontFamily: font.family }}
+          >
+            {font.style}
+          </option>
+        ))}
+      </select>
+      {previewText && (
+        <div 
+          className="mt-2 p-2 bg-gray-100 rounded text-center text-lg"
+          style={{ fontFamily: getFontFamily(currentFont) }}
+        >
+          {previewText}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderUploadArea = (zone: "lid" | "bottom", currentLogo: typeof lidLogo, logoSettings: typeof lidLogoSettings, setLogoSettings: typeof setLidLogoSettings, validation: ImageValidation | null) => {
+    if (currentLogo) {
+      const borderColor = validation?.status === 'success' 
+        ? 'border-green-400' 
+        : validation?.status === 'warning' 
+          ? 'border-yellow-400' 
+          : 'border-ui-border-base'
+      
+      const bgColor = validation?.status === 'success'
+        ? 'bg-green-50'
+        : validation?.status === 'warning'
+          ? 'bg-yellow-50'
+          : 'bg-ui-bg-base'
+
+      return (
+        <div className={`border-2 ${borderColor} rounded-lg p-3 ${bgColor}`}>
+          <div className="flex items-center gap-3 mb-2">
+            <img 
+              src={currentLogo.preview} 
+              alt="Logo" 
+              className="w-12 h-12 object-contain rounded border border-ui-border-base bg-white"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-ui-fg-base">{t.logo} ✓</p>
+              {validation && (
+                <p className={`text-xs ${
+                  validation.status === 'success' ? 'text-green-600' : 
+                  validation.status === 'warning' ? 'text-yellow-700' : 'text-red-600'
+                }`}>
+                  {validation.message}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => removeLogo(zone)}
+              className="p-2 text-ui-fg-muted hover:text-ui-fg-base hover:bg-white/50 rounded"
+            >
+              ✕
+            </button>
+          </div>
+          
+          {validation?.details && (
+            <p className="text-xs text-gray-500 mb-2 italic">
+              {validation.details}
+            </p>
+          )}
+          
+          <div className="space-y-2 pt-2 border-t border-gray-200">
+            {renderSlider(t.size, logoSettings.size, (v) => setLogoSettings(s => ({...s, size: v})), 25, 250, "%")}
+            {renderSlider(t.positionX, logoSettings.posX, (v) => setLogoSettings(s => ({...s, posX: v})), -50, 50, "")}
+            {renderSlider(t.positionY, logoSettings.posY, (v) => setLogoSettings(s => ({...s, posY: v})), -50, 50, "")}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, zone)}
+        onClick={() => (zone === "lid" ? lidFileInputRef : bottomFileInputRef).current?.click()}
+        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+          isDragging 
+            ? "border-ui-border-interactive bg-ui-bg-interactive-hover" 
+            : "border-ui-border-base bg-ui-bg-base hover:border-ui-border-strong"
+        }`}
+      >
+        <input
+          ref={zone === "lid" ? lidFileInputRef : bottomFileInputRef}
+          type="file"
+          accept="image/png,image/svg+xml,image/jpeg,image/jpg"
+          onChange={(e) => handleFileInputChange(e, zone)}
+          className="hidden"
+        />
+        <div className="text-2xl mb-1">{uploading ? "⏳" : "📁"}</div>
+        <p className="text-xs text-ui-fg-muted">
+          {uploading ? t.uploading : t.uploadLogo}
+        </p>
+      </div>
+    )
+  }
+
+  // Render preview content for a zone
+  const renderPreviewContent = (
+    zone: "lid" | "bottom",
+    text: string,
+    textSettings: typeof lidTextSettings,
+    logo: typeof lidLogo,
+    logoSettings: typeof lidLogoSettings,
+    fontId: string = 'roboto'
+  ) => {
+    const hasLogo = !!logo
+    const hasText = !!text
+
+    return (
+      <>
+        {hasLogo && (
+          <img 
+            src={logo!.preview} 
+            alt="Logo"
+            style={{
+              position: "absolute",
+              left: `calc(50% + ${getPositionOffset(logoSettings.posX)}px)`,
+              top: hasText 
+                ? `calc(40% + ${getPositionOffset(logoSettings.posY)}px)`
+                : `calc(50% + ${getPositionOffset(logoSettings.posY)}px)`,
+              transform: "translate(-50%, -50%)",
+              width: `${getLogoSize(logoSettings.size)}px`,
+              height: `${getLogoSize(logoSettings.size) * 0.7}px`,
+              objectFit: "contain",
+              filter: "brightness(0) invert(0.85)",
+            }}
+          />
+        )}
+        {hasText && (
+          <div
+            style={{
+              position: "absolute",
+              left: `calc(50% + ${getPositionOffset(textSettings.posX)}px)`,
+              top: hasLogo 
+                ? `calc(65% + ${getPositionOffset(textSettings.posY)}px)`
+                : `calc(50% + ${getPositionOffset(textSettings.posY)}px)`,
+              transform: "translate(-50%, -50%)",
+              color: ENGRAVING_COLOR,
+              fontSize: `${getBaseFontSize(text) * (textSettings.size / 100)}px`,
+              fontFamily: getFontFamily(fontId),
+              fontWeight: "500",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              letterSpacing: "0.5px",
+            }}
+          >
+            {text}
+          </div>
+        )}
+        {!hasLogo && !hasText && (
+          <span style={{ 
+            position: "absolute", 
+            left: "50%", 
+            top: "50%", 
+            transform: "translate(-50%, -50%)",
+            color: "rgba(255,255,255,0.2)", 
+            fontSize: `${11 * scaleFactor}px`
+          }}>
+            {zone === "lid" ? t.lid : `${t.bottom} ${t.inside}`}
+          </span>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: sliderThumbStyle }} />
+      
+      {/* Overlay - AUSSERHALB des Modals */}
+      {expanded && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9998]"
+          onClick={() => setExpanded(false)}
+        />
+      )}
+      
+      <div 
+      className={`border border-ui-border-base rounded-lg p-4 bg-ui-bg-subtle transition-all duration-300 ${
+        expanded ? "fixed inset-4 z-[9999] overflow-auto bg-white" : ""
+      }`}
+      style={expanded ? { maxWidth: "900px", margin: "0 auto", marginTop: "60px" } : {}}
+    >
+
+
+      {/* Header - versteckt im Maximize-Modus */}
+      {!expanded && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-lg">✨</span>
+            <span className="font-medium text-ui-fg-base">{t.personalization}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ui-fg-muted whitespace-nowrap">
+              {pricePerPersonalization.toFixed(2)} € {t.perOption}
+            </span>
+            <button
+              onClick={() => { const newState = !enabled; setEnabled(newState); if (newState && typeof window !== "undefined" && typeof window.umami?.track === "function") { window.umami.track("editor_opened", { color: variantColor }); } }}
+              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                enabled ? "bg-[#C9A962]" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-md ${
+                  enabled ? "translate-x-6" : "translate-x-0"
+                }`}
+                style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+              />
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Maximize-Modus Header mit nur Titel und Schließen-Button */}
+      {expanded && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">✨</span>
+            <span className="font-medium text-ui-fg-base">{t.personalization}</span>
+          </div>
+          <button
+            onClick={() => setExpanded(false)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            title={t.collapse}
+          >
+            <span className="text-xl">✕</span>
+          </button>
+        </div>
+      )}
+
+      {enabled && (
+        <>
+          {/* Expand Button */}
+          <div className="mb-3 flex justify-end">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs px-3 py-1.5 rounded border border-ui-border-base hover:bg-ui-bg-base-hover text-ui-fg-muted flex items-center gap-1"
+            >
+              {expanded ? "↙" : "↗"} {expanded ? t.collapse : t.expand}
+            </button>
+          </div>
+
+          {/* 3D Preview */}
+          <div className="mb-4 flex justify-center">
+            <div style={{ width: `${containerSize}px`, height: `${containerSize}px`, perspective: "600px" }}>
+              <div
+                style={{
+                  width: `${previewSize}px`,
+                  height: `${previewSize}px`,
+                  margin: `${(containerSize - previewSize) / 2}px auto`,
+                  borderRadius: "50%",
+                  background: `linear-gradient(145deg, ${bgColor}ee 0%, ${bgColor} 50%, ${bgColor}cc 100%)`,
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.4), inset 0 -8px 20px rgba(0,0,0,0.3), inset 0 8px 20px rgba(255,255,255,0.1)",
+                  transform: `rotateY(${rotation}deg)`,
+                  transition: "transform 0.1s ease-out",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Inner ring */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: `${previewSize - 20}px`,
+                    height: `${previewSize - 20}px`,
+                    borderRadius: "50%",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    pointerEvents: "none",
+                  }}
+                />
+                
+                {/* Content */}
+                {activeView === "lid" && renderPreviewContent("lid", lidText, lidTextSettings, lidLogo, lidLogoSettings, lidFont)}
+                {activeView === "bottom" && renderPreviewContent("bottom", bottomText, bottomTextSettings, bottomLogo, bottomLogoSettings, bottomFont)}
+              </div>
+            </div>
+          </div>
+
+          {/* Rotation Slider */}
+          <div className="mb-4">
+            <input
+              type="range"
+              min="-45"
+              max="45"
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="text-center text-xs text-ui-fg-muted mt-1">{t.rotateToView}</div>
+          </div>
+
+          {/* View Toggle */}
+          <div className="mb-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setActiveView("lid")}
+                className={`p-3 rounded-lg border text-sm font-medium transition flex items-center justify-center gap-2 ${
+                  activeView === "lid"
+                    ? "border-ui-border-interactive bg-ui-bg-interactive text-ui-fg-on-color"
+                    : "border-ui-border-base hover:border-ui-border-strong bg-ui-bg-base text-ui-fg-base"
+                }`}
+              >
+                <span>{t.lid}</span>
+                {(lidText || lidLogo) && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
+              </button>
+              <button
+                onClick={() => setActiveView("bottom")}
+                className={`p-3 rounded-lg border text-sm font-medium transition flex items-center justify-center gap-2 ${
+                  activeView === "bottom"
+                    ? "border-ui-border-interactive bg-ui-bg-interactive text-ui-fg-on-color"
+                    : "border-ui-border-base hover:border-ui-border-strong bg-ui-bg-base text-ui-fg-base"
+                }`}
+              >
+                <span>{t.bottom}</span>
+                {(bottomText || bottomLogo) && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
+              </button>
+            </div>
+          </div>
+
+          {/* Zone Configuration */}
+          <div className={`${expanded ? "grid grid-cols-2 gap-4" : ""}`}>
+            {(activeView === "lid" || expanded) && (
+              <div className="space-y-4 mb-4 p-3 bg-ui-bg-base rounded-lg border border-ui-border-base">
+                <h4 className="font-medium text-sm text-ui-fg-base">{t.lid} {t.personalizeZone}</h4>
+                
+                <div>
+                  <label className="block text-xs font-medium text-ui-fg-muted mb-1">
+                    {t.text} <span className="text-ui-fg-subtle">({lidText.length}/20)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={lidText}
+                    onChange={(e) => setLidText(e.target.value.slice(0, 20))}
+                    placeholder={t.egName}
+                    className="w-full p-2 text-sm border border-ui-border-base rounded-lg bg-ui-bg-field text-ui-fg-base focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
+                  />
+                  
+                  {lidText && (
+                    <div className="space-y-2 mt-3 pt-2 border-t border-ui-border-base">
+                      {renderFontSelect(lidFont, setLidFont, lidText)}
+                      {renderSlider(t.size, lidTextSettings.size, (v) => setLidTextSettings(s => ({...s, size: v})), 25, 250, "%")}
+                      {renderSlider(t.positionX, lidTextSettings.posX, (v) => setLidTextSettings(s => ({...s, posX: v})), -50, 50, "")}
+                      {renderSlider(t.positionY, lidTextSettings.posY, (v) => setLidTextSettings(s => ({...s, posY: v})), -50, 50, "")}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ui-fg-muted mb-1">{t.logo}</label>
+                  {renderUploadArea("lid", lidLogo, lidLogoSettings, setLidLogoSettings, lidImageValidation)}
+                </div>
+              </div>
+            )}
+
+            {(activeView === "bottom" || expanded) && (
+              <div className="space-y-4 mb-4 p-3 bg-ui-bg-base rounded-lg border border-ui-border-base">
+                <h4 className="font-medium text-sm text-ui-fg-base">{t.bottom} {t.inside} {t.personalizeZone}</h4>
+                
+                <div>
+                  <label className="block text-xs font-medium text-ui-fg-muted mb-1">
+                    {t.text} <span className="text-ui-fg-subtle">({bottomText.length}/20)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={bottomText}
+                    onChange={(e) => setBottomText(e.target.value.slice(0, 20))}
+                    placeholder={t.egSecret}
+                    className="w-full p-2 text-sm border border-ui-border-base rounded-lg bg-ui-bg-field text-ui-fg-base focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
+                  />
+                  
+                  {bottomText && (
+                    <div className="space-y-2 mt-3 pt-2 border-t border-ui-border-base">
+                      {renderFontSelect(bottomFont, setBottomFont, bottomText)}
+                      {renderSlider(t.size, bottomTextSettings.size, (v) => setBottomTextSettings(s => ({...s, size: v})), 25, 250, "%")}
+                      {renderSlider(t.positionX, bottomTextSettings.posX, (v) => setBottomTextSettings(s => ({...s, posX: v})), -50, 50, "")}
+                      {renderSlider(t.positionY, bottomTextSettings.posY, (v) => setBottomTextSettings(s => ({...s, posY: v})), -50, 50, "")}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ui-fg-muted mb-1">{t.logo}</label>
+                  {renderUploadArea("bottom", bottomLogo, bottomLogoSettings, setBottomLogoSettings, bottomImageValidation)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {uploadError && (
+            <p className="text-sm text-red-500 mb-4">{uploadError}</p>
+          )}
+
+          {/* Coupon Code */}
+          <div className="mb-4 p-3 bg-ui-bg-base rounded-lg border border-ui-border-base">
+            <label className="block text-xs font-medium text-ui-fg-muted mb-2">{t.couponCode}</label>
+            {!appliedCoupon ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  placeholder={t.enterCode}
+                  className="flex-1 p-2 text-sm border border-ui-border-base rounded-lg bg-ui-bg-field text-ui-fg-base focus:outline-none focus:ring-2 focus:ring-ui-border-interactive"
+                />
+                <button
+                  onClick={applyCoupon}
+                  disabled={!couponCode.trim()}
+                  className="px-4 py-2 text-sm bg-ui-bg-interactive text-ui-fg-on-color rounded-lg hover:bg-ui-bg-interactive-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t.redeem}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
+                <span className="text-sm text-green-700">
+                  ✓ {appliedCoupon.code} ({appliedCoupon.discount}% {t.discount})
+                </span>
+                <button
+                  onClick={removeCoupon}
+                  className="text-sm text-green-700 hover:text-green-900"
+                >
+                  {t.remove}
+                </button>
+              </div>
+            )}
+            {couponError && (
+              <p className="text-xs text-red-500 mt-1">{couponError}</p>
+            )}
+          </div>
+
+          {/* Price Summary */}
+          {personalizationCount > 0 && (
+            <div className="p-3 bg-ui-bg-base rounded-lg border border-ui-border-base">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between text-ui-fg-muted">
+                  <span>{personalizationCount}x {personalizationCount === 1 ? t.xPersonalization : t.xPersonalizations}</span>
+                  <span>{(personalizationCount * pricePerPersonalization).toFixed(2)} €</span>
+                </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{t.discount} ({appliedCoupon.discount}%)</span>
+                    <span>-{((personalizationCount * pricePerPersonalization) - totalPrice).toFixed(2)} €</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-medium text-ui-fg-base pt-1 border-t border-ui-border-base">
+                  <span>{t.total}</span>
+                  <span>{totalPrice.toFixed(2)} €</span>
+                </div>
+              </div>
+              
+              <div className="mt-3 pt-3 border-t border-ui-border-base text-xs text-ui-fg-muted space-y-0.5">
+                {lidText && <div>• {t.lidText}: "{lidText}" ({t.size}: {lidTextSettings.size}%)</div>}
+                {lidLogo && <div>• {t.lidLogo} ✓ ({t.size}: {lidLogoSettings.size}%)</div>}
+                {bottomText && <div>• {t.bottomText}: "{bottomText}" ({t.size}: {bottomTextSettings.size}%)</div>}
+                {bottomLogo && <div>• {t.bottomLogo} ✓ ({t.size}: {bottomLogoSettings.size}%)</div>}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+    </>
+  )
+}

@@ -1,0 +1,225 @@
+/* WELANDA Font Imports - MUST BE FIRST */
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&f[]=general-sans@400,500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* WELANDA Color Variables */
+    --welanda-black: #0A0A0A;
+    --welanda-charcoal: #1A1A1A;
+    --welanda-gunmetal: #2D2D2D;
+    --welanda-gold: #C9A962;
+    --welanda-gold-light: #E8D5A3;
+    --welanda-gold-dark: #A68B4B;
+    --welanda-cream: #FAF9F7;
+    --welanda-warm-white: #F5F3EF;
+    --welanda-silver: #B8B8B8;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-sans text-welanda-charcoal bg-white;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  /* Headings use Display Font */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold tracking-tight;
+  }
+
+  /* Selection Color */
+  ::selection {
+    background-color: var(--welanda-gold);
+    color: var(--welanda-black);
+  }
+}
+
+@layer utilities {
+  /* Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  input:focus ~ label,
+  input:not(:placeholder-shown) ~ label {
+    @apply -translate-y-2 text-xsmall-regular;
+  }
+
+  input:focus ~ label {
+    @apply left-0;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    border: 1px solid var(--welanda-charcoal);
+    -webkit-text-fill-color: var(--welanda-charcoal);
+    -webkit-box-shadow: 0 0 0px 1000px #fff inset;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-results-button,
+  input[type="search"]::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+  }
+
+  /* WELANDA Text Gradient */
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, var(--welanda-gold) 0%, var(--welanda-gold-light) 50%, var(--welanda-gold) 100%);
+  }
+
+  /* Subtle hover lift effect */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Stagger animation delays */
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+}
+
+@layer components {
+  .content-container {
+    @apply max-w-[1440px] w-full mx-auto px-6;
+  }
+
+  /* WELANDA Button Styles */
+  .btn-primary {
+    @apply px-8 py-3 bg-welanda-charcoal text-white font-display font-medium tracking-wide;
+    @apply hover:bg-welanda-black transition-all duration-300;
+    @apply focus:outline-none focus:ring-2 focus:ring-welanda-gold focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply px-8 py-3 bg-transparent text-welanda-charcoal font-display font-medium tracking-wide;
+    @apply border border-welanda-charcoal;
+    @apply hover:bg-welanda-charcoal hover:text-white transition-all duration-300;
+    @apply focus:outline-none focus:ring-2 focus:ring-welanda-gold focus:ring-offset-2;
+  }
+
+  .btn-gold {
+    @apply px-8 py-3 bg-welanda-gold text-welanda-black font-display font-semibold tracking-wide;
+    @apply hover:bg-welanda-gold-dark transition-all duration-300;
+    @apply focus:outline-none focus:ring-2 focus:ring-welanda-gold focus:ring-offset-2;
+  }
+
+  /* Legacy contrast button */
+  .contrast-btn {
+    @apply btn-secondary rounded-none;
+  }
+
+  /* WELANDA Card Style */
+  .card-product {
+    @apply bg-white border border-grey-20 p-4;
+    @apply hover:border-welanda-gold transition-all duration-300;
+  }
+
+  /* Section Heading */
+  .section-heading {
+    @apply font-display text-3xl small:text-4xl font-semibold tracking-tight text-welanda-charcoal;
+  }
+
+  .section-subheading {
+    @apply font-sans text-base text-grey-50 max-w-2xl;
+  }
+
+  /* Text Styles */
+  .text-xsmall-regular {
+    @apply text-[10px] leading-4 font-normal;
+  }
+
+  .text-small-regular {
+    @apply text-xs leading-5 font-normal;
+  }
+
+  .text-small-semi {
+    @apply text-xs leading-5 font-semibold;
+  }
+
+  .text-base-regular {
+    @apply text-sm leading-6 font-normal;
+  }
+
+  .text-base-semi {
+    @apply text-sm leading-6 font-semibold;
+  }
+
+  .text-large-regular {
+    @apply text-base leading-6 font-normal;
+  }
+
+  .text-large-semi {
+    @apply text-base leading-6 font-semibold;
+  }
+
+  .text-xl-regular {
+    @apply text-2xl leading-[36px] font-normal;
+  }
+
+  .text-xl-semi {
+    @apply text-2xl leading-[36px] font-semibold;
+  }
+
+  .text-2xl-regular {
+    @apply text-[30px] leading-[48px] font-normal;
+  }
+
+  .text-2xl-semi {
+    @apply text-[30px] leading-[48px] font-semibold;
+  }
+
+  .text-3xl-regular {
+    @apply text-[32px] leading-[44px] font-normal;
+  }
+
+  .text-3xl-semi {
+    @apply text-[32px] leading-[44px] font-semibold;
+  }
+
+  /* Price styling */
+  .price {
+    @apply font-mono font-medium tracking-tight;
+  }
+
+  .price-original {
+    @apply font-mono text-grey-40 line-through;
+  }
+
+  .price-sale {
+    @apply font-mono font-semibold text-red-600;
+  }
+}

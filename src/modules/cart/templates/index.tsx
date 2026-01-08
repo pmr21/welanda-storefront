@@ -1,0 +1,53 @@
+import ItemsTemplate from "./items"
+import Summary from "./summary"
+import EmptyCartMessage from "../components/empty-cart-message"
+import SignInPrompt from "../components/sign-in-prompt"
+import FreeShippingBar from "../components/free-shipping-bar"
+import Divider from "@modules/common/components/divider"
+import { HttpTypes } from "@medusajs/types"
+
+const CartTemplate = ({
+  cart,
+  customer,
+}: {
+  cart: HttpTypes.StoreCart | null
+  customer: HttpTypes.StoreCustomer | null
+}) => {
+  return (
+    <div className="py-12">
+      <div className="content-container px-4 small:px-8" data-testid="cart-container">
+        {cart?.items?.length ? (
+          <div className="grid grid-cols-1 small:grid-cols-[1fr_360px] gap-x-40">
+            <div className="flex flex-col bg-white py-6 px-4 small:px-6 gap-y-6 rounded-lg">
+              {!customer && (
+                <>
+                  <SignInPrompt />
+                  <Divider />
+                </>
+              )}
+              <ItemsTemplate cart={cart} />
+            </div>
+            <div className="relative">
+              <div className="flex flex-col gap-y-8 sticky top-12">
+                {cart && cart.region && (
+                  <>
+                    <div className="bg-white py-6 px-4 small:px-6 rounded-lg">
+                      <FreeShippingBar cartSubtotal={cart.subtotal || 0} />
+                      <Summary cart={cart as any} />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <EmptyCartMessage />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default CartTemplate
