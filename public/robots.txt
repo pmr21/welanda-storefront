@@ -1,0 +1,39 @@
+# WELANDA - Temporär gesperrt bis zum offiziellen Launch
+# Keine Indexierung erlaubt
+
+User-agent: *
+Disallow: /
+
+# Spezifische Crawler blockieren
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Twitterbot
+Disallow: /
+
+# Keine Sitemap bis zum Launch
+# Sitemap: https://welanda.com/sitemap.xml
