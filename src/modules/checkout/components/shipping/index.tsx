@@ -80,7 +80,7 @@ const Shipping = ({ cart, availableShippingMethods }: ShippingProps) => {
       : (currentMethod?.amount === 0 
         ? "Kostenlos" 
         : currentMethod?.amount 
-          ? (currentMethod.amount / 100).toFixed(2).replace(".", ",") + " EUR"
+          ? (currentMethod.amount).toFixed(2).replace(".", ",") + " EUR"
           : "Kostenlos")
     
     return (
@@ -162,7 +162,7 @@ const Shipping = ({ cart, availableShippingMethods }: ShippingProps) => {
           {availableShippingMethods.length > 0 ? (
             availableShippingMethods.map((method) => {
               // If qualifies for free shipping, show all methods as free
-              const originalPrice = method.amount ? (method.amount / 100).toFixed(2).replace(".", ",") : "0,00"
+              const originalPrice = method.amount ? (method.amount).toFixed(2).replace(".", ",") : "0,00"
               const isFree = qualifiesForFreeShipping || !method.amount || method.amount === 0
               const displayPrice = isFree ? "Kostenlos" : originalPrice + " EUR"
               
