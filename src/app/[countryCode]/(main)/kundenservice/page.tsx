@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Kundenservice | WELANDA",
+  title: "Kundenservice",
   description: "Kontaktieren Sie uns bei Fragen zu Ihrer Bestellung oder unseren Produkten.",
 }
 

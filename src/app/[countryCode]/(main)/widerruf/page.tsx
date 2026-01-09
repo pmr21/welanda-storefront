@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Widerrufsbelehrung | WELANDA",
+  title: "Widerrufsbelehrung",
   description: "Widerrufsbelehrung und Widerrufsformular für WELANDA.",
 }
 

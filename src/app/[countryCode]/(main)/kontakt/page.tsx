@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import ContactForm from "@modules/contact/contact-form"
 
 export const metadata: Metadata = {
-  title: "Kontakt | WELANDA",
+  title: "Kontakt",
   description: "Kontaktiere das WELANDA Team. Wir sind für dich da!",
 }
 

@@ -3,7 +3,7 @@ import Link from "next/link"
 import { getBlogPosts, getFeaturedPosts, getAllCategories } from "@lib/data/blog"
 
 export const metadata: Metadata = {
-  title: "Blog | WELANDA - Snus Dosen & Personalisierung",
+  title: "Blog - Snus Dosen & Personalisierung",
   description: "Tipps, Guides und News rund um Premium Snus Dosen, Personalisierung und EDC Lifestyle. Personalisiert in Hamburg.",
   keywords: "snus dose, snus box, personalisierung, lasergravur, edc, hamburg",
   openGraph: {

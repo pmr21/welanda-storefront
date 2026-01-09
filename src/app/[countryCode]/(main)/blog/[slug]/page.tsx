@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getBlogPost(params.slug)
   
   if (!post) {
-    return { title: "Artikel nicht gefunden | WELANDA" }
+    return { title: "Artikel nicht gefunden" }
   }
 
   const title = post.seoTitle || `${post.title} | WELANDA Blog`

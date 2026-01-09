@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Impressum | WELANDA",
+  title: "Impressum",
   description: "Impressum und rechtliche Informationen zu WELANDA.",
 }
 

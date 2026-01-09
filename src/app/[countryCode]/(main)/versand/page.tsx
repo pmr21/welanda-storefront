@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Versand & Lieferung | WELANDA",
+  title: "Versand & Lieferung",
   description: "Informationen zu Versandkosten, Lieferzeiten und Versandoptionen bei WELANDA.",
 }
 

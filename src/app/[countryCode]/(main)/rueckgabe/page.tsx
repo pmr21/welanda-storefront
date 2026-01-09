@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import Link from "next/link"
 
 export const metadata: Metadata = {
-  title: "Rückgabe & Umtausch | WELANDA",
+  title: "Rückgabe & Umtausch",
   description: "Informationen zu Rückgabe, Umtausch und Reklamationen bei WELANDA.",
 }
 

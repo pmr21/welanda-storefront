@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "FAQ - Häufige Fragen | WELANDA",
+  title: "FAQ - Häufige Fragen",
   description: "Antworten auf häufig gestellte Fragen zu WELANDA Snus Dosen, Personalisierung, Versand und mehr.",
 }
 
