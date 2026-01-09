@@ -112,14 +112,14 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const canonicalUrl = `https://welanda.com/${params.countryCode}/products/${handle}`
 
   return {
-    title: product.title + " | WELANDA",
+    title: product.title,
     description: description,
     keywords: [product.title || "", "personalisiert", "Gravur", "WELANDA", "Premium", "Snus Dose"].filter(Boolean),
     alternates: {
       canonical: canonicalUrl,
     },
     openGraph: {
-      title: product.title + " | WELANDA",
+      title: product.title,
       description: description,
       images: product.thumbnail ? [product.thumbnail] : [],
       type: "website",
@@ -128,7 +128,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: product.title + " | WELANDA",
+      title: product.title,
       description: description,
       images: product.thumbnail ? [product.thumbnail] : [],
     },

@@ -4,18 +4,24 @@ export default function OrganizationSchema() {
     "@type": "Organization",
     "name": "WELANDA",
     "url": "https://welanda.com",
-    "logo": "https://welanda.com/logo.png",
-    "description": "Hochwertige personalisierbare Snus Dosen & EDC Accessoires. Lasergravur made in Hamburg.",
+    "logo": "https://welanda.com/images/logo.png",
+    "description": "Hochwertige personalisierbare Snus Dosen & EDC Accessoires aus CNC-gefraestem Aluminium. Lasergravur made in Hamburg.",
+    "foundingDate": "2024",
     "address": {
       "@type": "PostalAddress",
+      "addressLocality": "Hamburg",
       "addressCountry": "DE"
     },
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "customer service",
-      "email": "support@welanda.com"
+      "email": "support@welanda.com",
+      "availableLanguage": ["German", "English"]
     },
-    "sameAs": []
+    "sameAs": [
+      "https://instagram.com/welanda",
+      "https://tiktok.com/@welanda"
+    ]
   }
 
   return (
