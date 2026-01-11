@@ -17,14 +17,21 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
   const [attempts, setAttempts] = useState(0)
 
   useEffect(() => {
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout | null = null
+
     const processPayment = async () => {
+      if (!isMounted) return
+
       try {
         // Refresh cart to get latest payment status
         const cart = await retrieveCart()
         
         if (!cart) {
-          setStatus("error")
-          setErrorMessage("Warenkorb nicht gefunden")
+          if (isMounted) {
+            setStatus("error")
+            setErrorMessage("Warenkorb nicht gefunden")
+          }
           return
         }
 
@@ -33,60 +40,136 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
         )
 
         if (!paymentSession) {
-          // No payment session - payment might have been cancelled
-          setStatus("cancelled")
+          // No payment session - payment might have been cancelled or order already completed
+          // Check if cart was already converted to order
+          if (!cart.payment_collection?.payment_sessions?.length) {
+            // Cart might have been completed - try redirecting to orders
+            if (isMounted) {
+              setStatus("cancelled")
+            }
+          }
           return
         }
 
-        // Check payment status from Mollie data
+        // IMPORTANT: Check Medusa payment session status FIRST (authoritative source)
+        // The webhook updates paymentSession.status, not paymentSession.data.status
+        const medusaStatus = paymentSession.status
         const mollieStatus = paymentSession.data?.status as string | undefined
 
-        if (mollieStatus === "paid" || mollieStatus === "authorized") {
-          // Payment successful - complete the order
+        console.log("[Payment] Medusa status:", medusaStatus, "| Mollie data status:", mollieStatus, "| Attempt:", attempts)
+
+        // If Medusa status is authorized, the webhook has confirmed the payment
+        if (medusaStatus === "authorized") {
+          // Payment confirmed by webhook - complete the order
           try {
             await placeOrder(cart.id)
-            setStatus("success")
+            if (isMounted) {
+              setStatus("success")
+            }
             // placeOrder will redirect to order confirmation automatically
           } catch (err: any) {
             // If order completion fails, it might be because webhook already completed it
-            // Try to redirect to order confirmation
-            if (err.message?.includes("redirect")) {
-              setStatus("success")
+            // or there's a redirect happening
+            if (err.message?.includes("redirect") || err.message?.includes("NEXT_REDIRECT")) {
+              if (isMounted) {
+                setStatus("success")
+              }
             } else {
-              setStatus("error")
-              setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
+              console.error("[Payment] Order completion error:", err)
+              if (isMounted) {
+                setStatus("error")
+                setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
+              }
             }
           }
-        } else if (mollieStatus === "cancelled" || mollieStatus === "expired" || mollieStatus === "failed") {
-          setStatus("cancelled")
-        } else if (mollieStatus === "open" || mollieStatus === "pending") {
-          // Payment still processing - wait and retry
-          if (attempts < 10) {
-            setAttempts(prev => prev + 1)
-            setTimeout(() => processPayment(), 2000) // Retry every 2 seconds
-          } else {
-            // Max attempts reached
-            setStatus("error")
-            setErrorMessage("Zahlungsstatus konnte nicht abgefragt werden. Bitte kontaktieren Sie uns.")
-          }
-        } else {
-          // Unknown status - try to complete anyway
+          return
+        }
+
+        // Check Mollie status from data field as fallback
+        if (mollieStatus === "paid" || mollieStatus === "authorized" || mollieStatus === "captured") {
+          // Payment successful according to Mollie - complete the order
           try {
             await placeOrder(cart.id)
-            setStatus("success")
+            if (isMounted) {
+              setStatus("success")
+            }
           } catch (err: any) {
+            if (err.message?.includes("redirect") || err.message?.includes("NEXT_REDIRECT")) {
+              if (isMounted) {
+                setStatus("success")
+              }
+            } else {
+              if (isMounted) {
+                setStatus("error")
+                setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
+              }
+            }
+          }
+          return
+        }
+
+        if (mollieStatus === "cancelled" || mollieStatus === "expired" || mollieStatus === "failed") {
+          if (isMounted) {
+            setStatus("cancelled")
+          }
+          return
+        }
+
+        // Payment still processing - wait and retry
+        if (mollieStatus === "open" || mollieStatus === "pending" || medusaStatus === "pending") {
+          if (attempts < 15) {
+            if (isMounted) {
+              setAttempts(prev => prev + 1)
+            }
+            timeoutId = setTimeout(() => processPayment(), 2000) // Retry every 2 seconds
+          } else {
+            // Max attempts reached - but try to complete anyway in case webhook worked
+            try {
+              await placeOrder(cart.id)
+              if (isMounted) {
+                setStatus("success")
+              }
+            } catch (err: any) {
+              if (isMounted) {
+                setStatus("error")
+                setErrorMessage("Zahlungsstatus konnte nicht abgefragt werden. Bitte kontaktieren Sie uns.")
+              }
+            }
+          }
+          return
+        }
+
+        // Unknown status - try to complete anyway
+        try {
+          await placeOrder(cart.id)
+          if (isMounted) {
+            setStatus("success")
+          }
+        } catch (err: any) {
+          if (isMounted) {
             setStatus("error")
             setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
           }
         }
       } catch (err: any) {
-        setStatus("error")
-        setErrorMessage(err.message || "Ein unerwarteter Fehler ist aufgetreten")
+        console.error("[Payment] Unexpected error:", err)
+        if (isMounted) {
+          setStatus("error")
+          setErrorMessage(err.message || "Ein unerwarteter Fehler ist aufgetreten")
+        }
       }
     }
 
     processPayment()
-  }, [])
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, []) // Empty dependency array - only run once on mount
 
   if (status === "processing") {
     return (
@@ -106,7 +189,7 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
           </p>
           {attempts > 0 && (
             <p className="text-sm text-gray-400 mt-4">
-              Pruefung {attempts}/10...
+              Pruefung {attempts}/15...
             </p>
           )}
         </div>
