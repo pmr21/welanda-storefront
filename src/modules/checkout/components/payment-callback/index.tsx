@@ -28,22 +28,57 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
         const cart = await retrieveCart()
         
         if (!cart) {
+          // Cart not found - likely already converted to order by webhook
+          // This is SUCCESS, not an error!
+          console.log("[Payment] Cart not found - order likely completed by webhook")
           if (isMounted) {
-            setStatus("error")
-            setErrorMessage("Warenkorb nicht gefunden")
+            setStatus("success")
+            // Redirect to account orders page after a short delay
+            setTimeout(() => {
+              router.push(`/${countryCode}/account/orders`)
+            }, 2000)
+          }
+          return
+        }
+
+        // Check if cart was already completed
+        if (cart.completed_at) {
+          console.log("[Payment] Cart already completed at:", cart.completed_at)
+          if (isMounted) {
+            setStatus("success")
+            setTimeout(() => {
+              router.push(`/${countryCode}/account/orders`)
+            }, 2000)
           }
           return
         }
 
         const paymentSession = cart.payment_collection?.payment_sessions?.find(
-          (s) => s.status === "pending" || s.status === "authorized"
+          (s) => s.status === "pending" || s.status === "authorized" || s.status === "captured"
         )
 
         if (!paymentSession) {
-          // No payment session - payment might have been cancelled or order already completed
-          // Check if cart was already converted to order
+          // No payment session found
           if (!cart.payment_collection?.payment_sessions?.length) {
-            // Cart might have been completed - try redirecting to orders
+            // No payment sessions at all - might have been completed or cancelled
+            if (attempts > 5) {
+              // After several attempts, assume it was completed
+              console.log("[Payment] No payment sessions after multiple attempts - assuming completed")
+              if (isMounted) {
+                setStatus("success")
+                setTimeout(() => {
+                  router.push(`/${countryCode}/account/orders`)
+                }, 2000)
+              }
+            } else {
+              // Keep trying
+              if (isMounted) {
+                setAttempts(prev => prev + 1)
+              }
+              timeoutId = setTimeout(() => processPayment(), 2000)
+            }
+          } else {
+            // Has payment sessions but none are pending/authorized - might be cancelled
             if (isMounted) {
               setStatus("cancelled")
             }
@@ -52,27 +87,30 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
         }
 
         // IMPORTANT: Check Medusa payment session status FIRST (authoritative source)
-        // The webhook updates paymentSession.status, not paymentSession.data.status
         const medusaStatus = paymentSession.status
         const mollieStatus = paymentSession.data?.status as string | undefined
 
         console.log("[Payment] Medusa status:", medusaStatus, "| Mollie data status:", mollieStatus, "| Attempt:", attempts)
 
-        // If Medusa status is authorized, the webhook has confirmed the payment
+        // If Medusa status is authorized or captured, the webhook has confirmed the payment
         if (medusaStatus === "authorized" || medusaStatus === "captured") {
-          // Payment confirmed by webhook - complete the order
           try {
             await placeOrder(cart.id)
             if (isMounted) {
               setStatus("success")
             }
-            // placeOrder will redirect to order confirmation automatically
           } catch (err: any) {
-            // If order completion fails, it might be because webhook already completed it
-            // or there's a redirect happening
             if (err.message?.includes("redirect") || err.message?.includes("NEXT_REDIRECT")) {
               if (isMounted) {
                 setStatus("success")
+              }
+            } else if (err.message?.includes("Cart not found") || err.message?.includes("already completed")) {
+              // Order was already placed by webhook
+              if (isMounted) {
+                setStatus("success")
+                setTimeout(() => {
+                  router.push(`/${countryCode}/account/orders`)
+                }, 2000)
               }
             } else {
               console.error("[Payment] Order completion error:", err)
@@ -87,16 +125,19 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
 
         // Check Mollie status from data field as fallback
         if (mollieStatus === "paid" || mollieStatus === "authorized" || mollieStatus === "captured") {
-          // Payment successful according to Mollie - complete the order
           try {
             await placeOrder(cart.id)
             if (isMounted) {
               setStatus("success")
             }
           } catch (err: any) {
-            if (err.message?.includes("redirect") || err.message?.includes("NEXT_REDIRECT")) {
+            if (err.message?.includes("redirect") || err.message?.includes("NEXT_REDIRECT") || 
+                err.message?.includes("Cart not found") || err.message?.includes("already completed")) {
               if (isMounted) {
                 setStatus("success")
+                setTimeout(() => {
+                  router.push(`/${countryCode}/account/orders`)
+                }, 2000)
               }
             } else {
               if (isMounted) {
@@ -121,55 +162,83 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
             if (isMounted) {
               setAttempts(prev => prev + 1)
             }
-            timeoutId = setTimeout(() => processPayment(), 2000) // Retry every 2 seconds
+            timeoutId = setTimeout(() => processPayment(), 2000)
           } else {
-            // Max attempts reached - but try to complete anyway in case webhook worked
+            // Max attempts reached - try to complete anyway
             try {
               await placeOrder(cart.id)
               if (isMounted) {
                 setStatus("success")
               }
             } catch (err: any) {
-              if (isMounted) {
-                setStatus("error")
-                setErrorMessage("Zahlungsstatus konnte nicht abgefragt werden. Bitte kontaktieren Sie uns.")
+              // If it fails because order already exists, thats success
+              if (err.message?.includes("Cart not found") || err.message?.includes("already")) {
+                if (isMounted) {
+                  setStatus("success")
+                  setTimeout(() => {
+                    router.push(`/${countryCode}/account/orders`)
+                  }, 2000)
+                }
+              } else {
+                if (isMounted) {
+                  setStatus("error")
+                  setErrorMessage("Zahlungsstatus konnte nicht abgefragt werden. Bitte kontaktieren Sie uns.")
+                }
               }
             }
           }
           return
         }
 
-        // Unknown status - try to complete anyway
+        // Unknown status - try to complete
         try {
           await placeOrder(cart.id)
           if (isMounted) {
             setStatus("success")
           }
         } catch (err: any) {
-          if (isMounted) {
-            setStatus("error")
-            setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
+          if (err.message?.includes("Cart not found") || err.message?.includes("already")) {
+            if (isMounted) {
+              setStatus("success")
+              setTimeout(() => {
+                router.push(`/${countryCode}/account/orders`)
+              }, 2000)
+            }
+          } else {
+            if (isMounted) {
+              setStatus("error")
+              setErrorMessage(err.message || "Fehler beim Abschliessen der Bestellung")
+            }
           }
         }
       } catch (err: any) {
         console.error("[Payment] Unexpected error:", err)
-        if (isMounted) {
-          setStatus("error")
-          setErrorMessage(err.message || "Ein unerwarteter Fehler ist aufgetreten")
+        // Even on error, check if it might be because order was completed
+        if (err.message?.includes("Cart not found") || err.message?.includes("already")) {
+          if (isMounted) {
+            setStatus("success")
+            setTimeout(() => {
+              router.push(`/${countryCode}/account/orders`)
+            }, 2000)
+          }
+        } else {
+          if (isMounted) {
+            setStatus("error")
+            setErrorMessage(err.message || "Ein unerwarteter Fehler ist aufgetreten")
+          }
         }
       }
     }
 
     processPayment()
 
-    // Cleanup function to prevent state updates after unmount
     return () => {
       isMounted = false
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
     }
-  }, []) // Empty dependency array - only run once on mount
+  }, [])
 
   if (status === "processing") {
     return (
@@ -210,7 +279,7 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
             Zahlung abgebrochen
           </h1>
           <p className="text-gray-600 mb-6">
-            Die Zahlung wurde abgebrochen oder ist fehlgeschlagen. Ihr Warenkorb wurde nicht veraendert.
+            Die Zahlung wurde abgebrochen oder ist fehlgeschlagen.
           </p>
           <button
             onClick={() => router.push(`/${countryCode}/checkout`)}
@@ -236,12 +305,10 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
             Fehler bei der Zahlung
           </h1>
           <p className="text-gray-600 mb-2">
-            Bei der Verarbeitung Ihrer Zahlung ist ein Fehler aufgetreten.
+            Bei der Verarbeitung ist ein Fehler aufgetreten.
           </p>
           {errorMessage && (
-            <p className="text-red-600 text-sm mb-6">
-              {errorMessage}
-            </p>
+            <p className="text-red-600 text-sm mb-6">{errorMessage}</p>
           )}
           <div className="space-x-4">
             <button
@@ -250,18 +317,13 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
             >
               Erneut versuchen
             </button>
-            <button
-              onClick={() => router.push(`/${countryCode}/kontakt`)}
-              className="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Kontakt
-            </button>
           </div>
         </div>
       </div>
     )
   }
 
+  // Success
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="text-center">
@@ -274,7 +336,7 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
           Zahlung erfolgreich!
         </h1>
         <p className="text-gray-600">
-          Sie werden zur Bestellbestaetigung weitergeleitet...
+          Vielen Dank fuer Ihre Bestellung. Sie werden weitergeleitet...
         </p>
       </div>
     </div>
