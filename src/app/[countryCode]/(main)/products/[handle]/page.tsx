@@ -90,13 +90,19 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 
   const canonicalUrl = `https://welanda.com/${params.countryCode}/products/${handle}`
 
+  // Determine if we should use absolute title (skip template)
+  // If custom SEO title already contains WELANDA, use it as-is
+  const titleConfig = seo?.meta_title && seo.meta_title.toLowerCase().includes('welanda')
+    ? { absolute: seo.meta_title }
+    : title
+
   return {
-    title: title,
+    title: titleConfig,
     description: description,
     keywords: keywords,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: title,
+      title: titleConfig,
       description: description,
       images: product.thumbnail ? [product.thumbnail] : [],
       type: "website",
@@ -105,7 +111,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: title,
+      title: titleConfig,
       description: description,
       images: product.thumbnail ? [product.thumbnail] : [],
     },
