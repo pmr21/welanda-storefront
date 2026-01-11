@@ -59,7 +59,7 @@ const PaymentCallback = ({ cart: initialCart, countryCode }: PaymentCallbackProp
         console.log("[Payment] Medusa status:", medusaStatus, "| Mollie data status:", mollieStatus, "| Attempt:", attempts)
 
         // If Medusa status is authorized, the webhook has confirmed the payment
-        if (medusaStatus === "authorized") {
+        if (medusaStatus === "authorized" || medusaStatus === "captured") {
           // Payment confirmed by webhook - complete the order
           try {
             await placeOrder(cart.id)
